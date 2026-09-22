@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import {
   ShrimpPredictionRecord,
@@ -490,16 +491,27 @@ yolo detect train data=dataset.yaml model=yolov8n.pt epochs=50 imgsz=640
 
         <div className="flex items-center gap-2">
           {isAdmin ? (
-            <div className="flex items-center gap-1.5 bg-emerald-950/70 border border-emerald-700/60 rounded-xl px-2.5 py-1.5 text-xs text-emerald-300">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              <span className="font-semibold text-[11px]">Admin Aktif</span>
-              <button
-                onClick={handleAdminLogout}
-                className="ml-1 text-[10px] text-slate-400 hover:text-rose-300 underline"
-                title="Keluar dari mode admin"
+            <div className="flex items-center gap-1.5">
+              <Link
+                href="/admin/load-test"
+                className="flex items-center gap-1 bg-amber-950/60 border border-amber-700/60 hover:bg-amber-900/60 rounded-xl px-2.5 py-1.5 text-xs text-amber-300 font-medium active:scale-95 transition-all shadow-sm"
+                title="Buka suite pengujian beban dan konkurensi AI"
               >
-                Keluar
-              </button>
+                <Zap className="h-3.5 w-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Uji Beban AI</span>
+                <span className="sm:hidden">Uji Beban</span>
+              </Link>
+              <div className="flex items-center gap-1.5 bg-emerald-950/70 border border-emerald-700/60 rounded-xl px-2.5 py-1.5 text-xs text-emerald-300">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                <span className="font-semibold text-[11px]">Admin</span>
+                <button
+                  onClick={handleAdminLogout}
+                  className="ml-1 text-[10px] text-slate-400 hover:text-rose-300 underline"
+                  title="Keluar dari mode admin"
+                >
+                  Keluar
+                </button>
+              </div>
             </div>
           ) : (
             <button
@@ -891,10 +903,14 @@ yolo detect train data=dataset.yaml model=yolov8n.pt epochs=50 imgsz=640
           </p>
         </div>
 
-        <div className="pt-2 flex items-center justify-between border-t border-rose-950/60">
-          <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
-            <Lock className="h-3 w-3 text-rose-500/70" /> Password Protected
-          </span>
+        <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-rose-950/60">
+          <Link
+            href="/admin/load-test"
+            className="flex items-center gap-1.5 rounded-xl border border-amber-700/60 bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 px-3 py-2 text-xs font-semibold active:scale-95 transition-all shadow-sm"
+          >
+            <Zap className="h-3.5 w-3.5 text-amber-400" />
+            Suite Uji Beban & Konkurensi AI
+          </Link>
 
           <button
             type="button"

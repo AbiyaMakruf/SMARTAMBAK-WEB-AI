@@ -35,6 +35,9 @@ Dokumen ini ditujukan sebagai panduan komprehensif bagi **AI Agent** yang melanj
 website-ai-smartambak/
 ├── src/
 │   ├── app/
+│   │   ├── admin/
+│   │   │   └── load-test/
+│   │   │       └── page.tsx              # Suite Uji Beban & Analisis Konkurensi AI (Admin Only)
 │   │   ├── api/
 │   │   │   ├── predict/route.ts          # Proxy inferensi paralel 3 model & multi-key fallback
 │   │   │   ├── report/delete/route.ts    # Endpoint hapus sampel tertentu (Password "Abiyajr11")
@@ -47,9 +50,9 @@ website-ai-smartambak/
 │   ├── components/
 │   │   ├── CameraCapture.tsx             # Kamera live Safari iOS (WYSIWYG 1:1) & galeri
 │   │   ├── HumanDecisionBox.tsx          # Form ground-truth udang vs null, real count, & tags
-│   │   ├── ImageEditorModal.tsx          # Simulasi kondisi ekstrem (kecerahan, kontras, keruh)
+│   │   ├── ImageEditorModal.tsx          # Simulasi kondisi ekstrem (blur, noise, silau, keruh, lumut)
 │   │   ├── ModelResultCard.tsx           # Kartu output model AI & bounding box overlay
-│   │   ├── Navbar.tsx                    # Header & bottom navigation mobile
+│   │   ├── Navbar.tsx                    # Header & bottom navigation mobile (Deteksi, Laporan, Uji Beban)
 │   │   └── SampleDetailModal.tsx         # Visualizer 4-gambar (Asli, AI 1, 2, 3), canvas render
 │   ├── lib/
 │   │   ├── annotator.ts                  # Render bounding box ke Canvas & export JPEG blob
@@ -119,17 +122,51 @@ Diimplementasikan di `src/components/HumanDecisionBox.tsx`:
 
 ## 7. Fitur Simulasi Kondisi Ekstrem / Edit Gambar (`src/components/ImageEditorModal.tsx`)
 
-- Memungkinkan pengguna menguji ketahanan model pada skenario lapangan ekstrem sebelum diinferensi:
-  - **Brightness (Kecerahan)**: -80% s/d +80% (menguji minim cahaya malam vs silau matahari).
-  - **Contrast (Kontras)**: -60% s/d +80% (menguji bayangan keras & kontras tinggi).
-  - **Saturation (Saturasi)**: -80% s/d +80%.
-  - **Pond Turbidity (Kekeruhan Air Kolam)**: Simulasi air tambak berwarna kecokelatan/keruh dan berkabut.
-  - **Preset Cepat**: Normal, Malam / Gelap, Silau Terik, Air Keruh, dan Kontras Tinggi.
-- Menggunakan HTML5 Canvas filter dan menghasilkan file baru yang langsung diinferensi ulang ke 3 model AI.
+- Memungkinkan pengguna menguji ketahanan model pada skenario lapangan ekstrem sebelum diinferensi melalui multi-pass HTML5 Canvas:
+  - **Tab Cahaya & Kontras**:
+    - **Brightness (Kecerahan)**: -80% s/d +80% (menguji minim cahaya malam vs silau terik matahari).
+    - **Contrast (Kontras)**: -60% s/d +80% (menguji bayangan tajam vs flat backlight).
+    - **Saturation (Saturasi)**: -80% s/d +80% (menguji warna pudar vs warna over-saturated).
+  - **Tab Buram & Noise**:
+    - **Focus Blur**: 0 s/d 12px (menguji kamera salah fokus / autofokus meleset).
+    - **Motion Blur**: 0 s/d 22px (menguji tangan bergoyang / udang bergerak cepat saat difoto).
+    - **Digital Noise / ISO Grain**: 0 s/d 100% (menguji sensor kamera HP murah di kondisi minim cahaya).
+    - **Low-Res Pixelation**: 0 s/d 90% (menguji kompresi ekstrem WhatsApp atau kamera beresolusi rendah).
+  - **Tab Air Tambak & Optik**:
+    - **Pond Turbidity (Air Keruh)**: 0 s/d 100% (mensimulasikan partikel tersuspensi dan lumpur kolam tambak).
+    - **Algae Bloom (Air Hijau Lumut)**: 0 s/d 100% (mensimulasikan ledakan fitoplankton dan warna hijau pekat air kolam).
+    - **Sun Glare (Pantulan Silau Air)**: 0 s/d 100% (mensimulasikan pantulan cahaya matahari pada permukaan air tambak).
+  - **9 Preset Cepat**:
+    - *Normal*, *Kamera Goyang*, *Noise Malam*, *Silau Air*, *Air Keruh*, *Air Hijau Lumut*, *Minim Cahaya*, *Kompresi Rendah*, *Kontras Tinggi*.
+- Menggunakan HTML5 Canvas multi-pass render pipeline dan mengekspor Blob JPEG beresolusi tinggi yang langsung dikirimkan ke alur inferensi paralel 3 model AI.
 
 ---
 
-## 8. Dashboard Laporan, Mode Admin, & Visualizer 4-Gambar (`src/app/report/page.tsx`)
+## 8. Suite Uji Beban & Analisis Konkurensi AI (`src/app/admin/load-test/page.tsx`)
+
+Halaman khusus pengujian performa endpoint Cloud Run dan throughput inferensi:
+- **Autentikasi Admin Terproteksi**: Menggunakan password yang sama (`Abiyajr11`). Terintegrasi dengan sesi admin `smartambak_admin`.
+- **Target Model Fleksibel**:
+  - `model_1` (Multiclass)
+  - `model_2` (Binaryclass)
+  - `model_3` (Baseline)
+  - `all` (Inferensi 3 model secara simultan via proxy `/api/predict`)
+- **2 Mode Pengujian Beban**:
+  1. **Fixed Concurrency Mode**: Menguji sejumlah *concurrent users* tetap (1 s/d 30) dengan total request tertentu (5 s/d 100).
+  2. **Step-Up Ladder Test Mode**: Bertahap menaikkan konkurensi (1 ➔ 3 ➔ 5 ➔ 10 ➔ 20 concurrent users) untuk mengukur kurva degradasi waktu respon (apakah makin banyak request makin lambat).
+- **Synthetic Image Payload**: Menghasilkan gambar kanvas uji berukuran realistis secara instan tanpa membebani storage Supabase.
+- **Client-Side Worker Pool Runner**: Menjalankan *batch request* secara konkruen dengan kontrol pembatalan instan (`AbortController`).
+- **Analisis & Metrik Lengkap**:
+  - Total Selesai, Success Rate (%), Throughput (RPS - Requests Per Second).
+  - Distribusi Latensi: Rata-rata (Avg), Min, Max, P50 (Median), dan P95 (Tail Latency).
+  - Visualisasi timeline latensi interaktif dan grafik bar Step-Up Concurrency vs Latency.
+  - Log request mendetail dengan kode HTTP, latensi per request, dan filter status.
+  - **Diagnostik AI Otomatis**: Mendeteksi *cold start*, mengukur degradasi latensi di bawah beban, dan memberikan evaluasi kesiapan produksi Cloud Run.
+  - **Ekspor Laporan JSON**: Mengunduh rekaman hasil uji beban untuk dokumentasi teknis atau laporan kapasitas infrastruktur.
+
+---
+
+## 9. Dashboard Laporan, Mode Admin, & Visualizer 4-Gambar (`src/app/report/page.tsx`)
 
 1. **Akses Mode Admin & Hapus Sampel Tertentu**:
    - Password Admin: `Abiyajr11` (sama dengan password reset seluruh data).
@@ -150,7 +187,7 @@ Diimplementasikan di `src/components/HumanDecisionBox.tsx`:
 
 ---
 
-## 9. Supabase Database & Storage
+## 10. Supabase Database & Storage
 
 - **Instance URL**: `https://pkzqlpbhvuiezesstlmz.supabase.co`
 - **Storage Bucket**: `smartambak` (Public)
@@ -159,7 +196,7 @@ Diimplementasikan di `src/components/HumanDecisionBox.tsx`:
 
 ---
 
-## 10. Penanganan Kredensial & Environment Variables
+## 11. Penanganan Kredensial & Environment Variables
 
 - File `.env.local` disimpan dalam arsip zip terenkripsi:
   - **File**: `env.zip`

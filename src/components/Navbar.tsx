@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Camera, BarChart3, Waves, ShieldCheck } from "lucide-react";
+import { Camera, BarChart3, Waves, ShieldCheck, Zap } from "lucide-react";
 
 export function Header() {
   return (
@@ -41,10 +41,10 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/95 backdrop-blur-lg pb-safe">
-      <div className="mx-auto flex max-w-lg items-center justify-around px-3 py-2">
+      <div className="mx-auto flex max-w-lg items-center justify-around px-2 py-2">
         <Link
           href="/"
-          className={`flex flex-col items-center gap-1 rounded-xl px-4 py-1.5 transition-all active:scale-95 ${
+          className={`flex flex-col items-center gap-1 rounded-xl px-3 py-1.5 transition-all active:scale-95 ${
             pathname === "/"
               ? "text-cyan-400 font-semibold bg-cyan-950/40"
               : "text-slate-400 hover:text-slate-200"
@@ -56,7 +56,7 @@ export function BottomNav() {
 
         <Link
           href="/report"
-          className={`flex flex-col items-center gap-1 rounded-xl px-4 py-1.5 transition-all active:scale-95 ${
+          className={`flex flex-col items-center gap-1 rounded-xl px-3 py-1.5 transition-all active:scale-95 ${
             pathname === "/report"
               ? "text-cyan-400 font-semibold bg-cyan-950/40"
               : "text-slate-400 hover:text-slate-200"
@@ -64,6 +64,18 @@ export function BottomNav() {
         >
           <BarChart3 className="h-5 w-5" />
           <span className="text-[11px]">Laporan & Log</span>
+        </Link>
+
+        <Link
+          href="/admin/load-test"
+          className={`flex flex-col items-center gap-1 rounded-xl px-3 py-1.5 transition-all active:scale-95 ${
+            pathname?.startsWith("/admin")
+              ? "text-amber-400 font-semibold bg-amber-950/40"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <Zap className="h-5 w-5" />
+          <span className="text-[11px]">Uji Beban</span>
         </Link>
       </div>
     </nav>

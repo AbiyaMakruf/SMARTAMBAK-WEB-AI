@@ -23,9 +23,9 @@ Aplikasi web *mobile-friendly* modern berbasis **Next.js 14 (App Router)**, **Ta
   2. **Model 2 (Binaryclass)**: Klasifikasi cepat kondisi umum (*Sehat vs Sakit*).
   3. **Model 3 (Baseline / Old Model)**: Model acuan historis.
 - **Mekanisme Multi-Key & Auto-Fallback**: Server otomatis melakukan *retry* dengan kunci alternatif jika terjadi error HTTP 401 Unauthorized.
-- **Simulasi Kondisi Ekstrem / Edit Gambar**:
-  - Slider kecerahan (*brightness* -80% s/d +80%), kontras, saturasi, dan kekeruhan air tambak (*pond turbidity*).
-  - Preset cepat: *Normal*, *Malam / Gelap*, *Silau Terik*, *Air Keruh*, dan *Kontras Tinggi* untuk menguji ketahanan model pada *edge cases*.
+- **Simulasi Kondisi Ekstrem / Edit Gambar Lapangan**:
+  - **10 Parameter Kendali**: Brightness, Contrast, Saturation, Focus Blur (kamera blur), Motion Blur (tangan bergoyang), Digital Noise / ISO Grain (sensor HP murah malam hari), Pond Turbidity (air lumpur kolam), Algae Bloom (air kolam hijau lumut), Sun Glare (pantulan terik matahari), dan Low-Res Pixelation (kompresi WA).
+  - **9 Preset Cepat**: *Normal*, *Kamera Goyang*, *Noise Malam*, *Silau Air*, *Air Keruh*, *Air Hijau Lumut*, *Minim Cahaya*, *Kompresi Rendah*, dan *Kontras Tinggi* untuk menguji ketahanan model pada *edge cases*.
 - **Visualisasi Hasil**: Bounding box SVG/Canvas dinamis berskala ternormalisasi, badge warna tematik per penyakit, dan indikator latensi inferensi (*speed* dalam ms).
 
 ### 3. Human Verification, Ground Truth Count, & Catatan Lapangan
@@ -48,6 +48,15 @@ Aplikasi web *mobile-friendly* modern berbasis **Next.js 14 (App Router)**, **Ta
   - Mengunduh seluruh gambar non-udang / salah deteksi ke dalam arsip `.zip` berstandar Ultralytics YOLO (`images/`, `labels/` kosong, `dataset.yaml`).
 - **Reset Seluruh Data Terproteksi Password**:
   - Tombol reset seluruh data database dengan proteksi kata sandi admin (`Abiyajr11`).
+
+### 5. Suite Uji Beban & Analisis Konkurensi AI (`/admin/load-test`)
+- **Autentikasi Terproteksi Admin** (`Abiyajr11`): Menguji batas throughput dan ketahanan Cloud Run.
+- **Targeting Fleksibel**: Uji Model 1, Model 2, Model 3, atau seluruh model secara paralel.
+- **2 Mode Pengujian**:
+  - *Fixed Concurrency*: 1–30 concurrent users dengan 5–100 total requests.
+  - *Step-Up Ladder Test*: 1 ➔ 3 ➔ 5 ➔ 10 ➔ 20 concurrent users otomatis untuk melihat kurva kenaikan latensi.
+- **Metrik Kinerja Real-Time**: RPS throughput, waktu respon Avg / Min / Max / P50 / P95, success rate, dan deteksi cold-start otomatis.
+- **Ekspor Laporan JSON**: Unduh rekaman pengujian beban dengan 1-klik untuk dokumentasi teknis.
 
 ---
 
