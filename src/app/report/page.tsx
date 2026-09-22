@@ -8,6 +8,7 @@ import {
   ModelMetricDetail,
 } from "@/types/prediction";
 import JSZip from "jszip";
+import { SampleDetailModal } from "@/components/SampleDetailModal";
 import {
   BarChart3,
   CheckCircle2,
@@ -30,6 +31,9 @@ import {
   Lock,
   KeyRound,
   ShieldAlert,
+  ShieldCheck,
+  LogOut,
+  Hash,
 } from "lucide-react";
 
 export default function ReportPage() {
@@ -39,6 +43,18 @@ export default function ReportPage() {
   const [isZipping, setIsZipping] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<ShrimpPredictionRecord | null>(null);
+
+  // Admin authentication state
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
+  const [adminLoginPasswordInput, setAdminLoginPasswordInput] = useState("");
+  const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
+  const [isVerifyingAdmin, setIsVerifyingAdmin] = useState(false);
+
+  // Single sample delete state
+  const [deleteConfirmRecord, setDeleteConfirmRecord] = useState<ShrimpPredictionRecord | null>(null);
+  const [isDeletingSingle, setIsDeletingSingle] = useState(false);
 
   // Password-protected reset modal state
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -374,6 +390,90 @@ yolo detect train data=dataset.yaml model=yolov8n.pt epochs=50 imgsz=640
     }
   };
 
+  // Restore admin session
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedAdmin = sessionStorage.getItem("smartambak_admin");
+      const savedPass = sessionStorage.getItem("smartambak_admin_pass");
+      if (savedAdmin === "true" && savedPass) {
+        setIsAdmin(true);
+        setAdminPassword(savedPass);
+      }
+    }
+  }, []);
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminLoginPasswordInput) {
+      setAdminLoginError("Silakan masukkan kata sandi admin.");
+      return;
+    }
+    setIsVerifyingAdmin(true);
+    setAdminLoginError(null);
+    try {
+      const res = await fetch("/api/report/verify-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminLoginPasswordInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Kata sandi admin salah.");
+      }
+      setIsAdmin(true);
+      setAdminPassword(adminLoginPasswordInput);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("smartambak_admin", "true");
+        sessionStorage.setItem("smartambak_admin_pass", adminLoginPasswordInput);
+      }
+      setIsAdminLoginModalOpen(false);
+      setAdminLoginPasswordInput("");
+    } catch (err: any) {
+      setAdminLoginError(err.message || "Gagal verifikasi admin.");
+    } finally {
+      setIsVerifyingAdmin(false);
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdmin(false);
+    setAdminPassword("");
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("smartambak_admin");
+      sessionStorage.removeItem("smartambak_admin_pass");
+    }
+  };
+
+  const handleDeleteSingleRecord = async () => {
+    if (!deleteConfirmRecord || !deleteConfirmRecord.id) return;
+    setIsDeletingSingle(true);
+    try {
+      const res = await fetch("/api/report/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: deleteConfirmRecord.id,
+          password: adminPassword || "Abiyajr11",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal menghapus rekam sampel.");
+      }
+      const updated = records.filter((r) => r.id !== deleteConfirmRecord.id);
+      setRecords(updated);
+      setStats(computeStats(updated));
+      if (selectedRecord?.id === deleteConfirmRecord.id) {
+        setSelectedRecord(null);
+      }
+      setDeleteConfirmRecord(null);
+    } catch (err: any) {
+      alert(err.message || "Gagal menghapus data.");
+    } finally {
+      setIsDeletingSingle(false);
+    }
+  };
+
   return (
     <div className="space-y-4 pb-24 pt-2">
       {/* Header */}
@@ -388,14 +488,43 @@ yolo detect train data=dataset.yaml model=yolov8n.pt epochs=50 imgsz=640
           </p>
         </div>
 
-        <button
-          onClick={fetchData}
-          disabled={isLoading}
-          className="shrink-0 flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 rounded-xl px-3 py-2 active:scale-95 disabled:opacity-50 font-medium shadow-sm transition-all"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-          Segarkan
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin ? (
+            <div className="flex items-center gap-1.5 bg-emerald-950/70 border border-emerald-700/60 rounded-xl px-2.5 py-1.5 text-xs text-emerald-300">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="font-semibold text-[11px]">Admin Aktif</span>
+              <button
+                onClick={handleAdminLogout}
+                className="ml-1 text-[10px] text-slate-400 hover:text-rose-300 underline"
+                title="Keluar dari mode admin"
+              >
+                Keluar
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setAdminLoginError(null);
+                setAdminLoginPasswordInput("");
+                setIsAdminLoginModalOpen(true);
+              }}
+              className="flex items-center gap-1 text-xs text-slate-300 hover:text-white bg-slate-800/80 border border-slate-700 rounded-xl px-2.5 py-2 font-medium active:scale-95 transition-all"
+              title="Login admin untuk fitur hapus data"
+            >
+              <KeyRound className="h-3.5 w-3.5 text-amber-400" />
+              Mode Admin
+            </button>
+          )}
+
+          <button
+            onClick={fetchData}
+            disabled={isLoading}
+            className="shrink-0 flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 rounded-xl px-3 py-2 active:scale-95 disabled:opacity-50 font-medium shadow-sm transition-all"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            Segarkan
+          </button>
+        </div>
       </div>
 
       {errorMsg && (
@@ -639,6 +768,9 @@ yolo detect train data=dataset.yaml model=yolov8n.pt epochs=50 imgsz=640
               const selected = rec.selected_models || [];
               const isNullSample = !rec.human_is_shrimp;
               const hasMistake = selected.length < 3 || isNullSample;
+              const m1Count = rec.model_1_output?.images?.[0]?.results?.length || 0;
+              const m2Count = rec.model_2_output?.images?.[0]?.results?.length || 0;
+              const m3Count = rec.model_3_output?.images?.[0]?.results?.length || 0;
 
               return (
                 <div
@@ -651,7 +783,7 @@ yolo detect train data=dataset.yaml model=yolov8n.pt epochs=50 imgsz=640
                   }`}
                 >
                   {/* Thumbnail */}
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-800 bg-black">
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-slate-800 bg-black">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={rec.image_url}
@@ -688,42 +820,56 @@ yolo detect train data=dataset.yaml model=yolov8n.pt epochs=50 imgsz=640
                       </span>
                     </div>
 
-                    {/* Selected Models Badges */}
-                    <div className="flex flex-wrap gap-1">
-                      {selected.length === 0 ? (
-                        <span className="text-[10px] text-rose-400 italic">Semua model salah</span>
-                      ) : (
-                        selected.map((sm) => (
-                          <span
-                            key={sm}
-                            className="rounded bg-cyan-950/50 border border-cyan-800/40 px-1 py-0.2 text-[9px] font-semibold text-cyan-300"
-                          >
-                            {sm === "model_1" ? "M1: Multi" : sm === "model_2" ? "M2: Binary" : "M3: Base"}
-                          </span>
-                        ))
-                      )}
+                    {/* Per-model box count indicators */}
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                      <span className="rounded bg-slate-950 px-1.5 py-0.5 border border-slate-800 text-cyan-300">
+                        M1: {m1Count} Box
+                      </span>
+                      <span className="rounded bg-slate-950 px-1.5 py-0.5 border border-slate-800 text-cyan-300">
+                        M2: {m2Count} Box
+                      </span>
+                      <span className="rounded bg-slate-950 px-1.5 py-0.5 border border-slate-800 text-cyan-300">
+                        M3: {m3Count} Box
+                      </span>
                     </div>
 
                     {rec.notes && (
-                      <p className="truncate text-[11px] text-slate-400 italic">
-                        &quot;{rec.notes}&quot;
+                      <p className="truncate text-[11px] text-slate-300 bg-slate-950/80 rounded-md px-2 py-0.5 border border-slate-800/80">
+                        📝 {rec.notes}
                       </p>
                     )}
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDownloadSingleImage(rec.image_url, rec.id || "image");
                       }}
-                      className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-cyan-400 hover:bg-slate-700"
-                      title="Download Foto"
+                      className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-cyan-400 hover:bg-slate-700 transition-colors"
+                      title="Download Foto Asli"
                     >
                       <Download className="h-3.5 w-3.5" />
                     </button>
+
+                    {/* Admin Delete Action */}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirmRecord(rec);
+                        }}
+                        disabled={isDeletingSingle && deleteConfirmRecord?.id === rec.id}
+                        className="p-2 rounded-xl bg-rose-950/70 border border-rose-800/70 text-rose-300 hover:bg-rose-900/80 hover:text-white transition-colors"
+                        title="Hapus Sampel Ini (Admin)"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+
                     <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-slate-400 transition-colors" />
                   </div>
                 </div>
@@ -733,7 +879,7 @@ yolo detect train data=dataset.yaml model=yolov8n.pt epochs=50 imgsz=640
         )}
       </div>
 
-      {/* Zona Administrasi: Reset Data */}
+      {/* Zona Administrasi: Reset Seluruh Data */}
       <div className="rounded-2xl border border-rose-950/70 bg-gradient-to-b from-rose-950/20 via-slate-900 to-slate-950 p-4 space-y-3 shadow-lg">
         <div className="space-y-1">
           <div className="flex items-center gap-1.5 text-xs font-bold text-rose-400">
@@ -766,97 +912,118 @@ yolo detect train data=dataset.yaml model=yolov8n.pt epochs=50 imgsz=640
         </div>
       </div>
 
-      {/* Modal Detail Inspeksi */}
-      {selectedRecord && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/80 backdrop-blur-sm p-3">
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-3 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-              <h3 className="font-bold text-slate-100 text-sm">Detail Rekam Sampel</h3>
+      {/* Modal Detail & Visualisasi 4 Gambar (Asli + AI 1, 2, 3) */}
+      <SampleDetailModal
+        record={selectedRecord}
+        onClose={() => setSelectedRecord(null)}
+        isAdmin={isAdmin}
+        onDelete={(rec) => setDeleteConfirmRecord(rec)}
+        formatDate={formatDate}
+      />
+
+      {/* Modal Login Mode Admin */}
+      {isAdminLoginModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-100">
+                <KeyRound className="h-4 w-4 text-amber-400" />
+                Akses Mode Admin
+              </div>
               <button
-                onClick={() => setSelectedRecord(null)}
+                onClick={() => setIsAdminLoginModalOpen(false)}
                 className="rounded-lg p-1 text-slate-400 hover:text-white bg-slate-800/80"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Image Preview */}
-            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-slate-700 bg-black">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={selectedRecord.image_url}
-                alt="Detail Sampel"
-                className="h-full w-full object-contain"
-              />
-            </div>
+            <p className="text-xs text-slate-300">
+              Masukkan kata sandi admin untuk mengaktifkan izin menghapus sampel gambar tertentu.
+            </p>
 
-            {/* Metadata Information */}
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between text-slate-400">
-                <span>Waktu Perekaman:</span>
-                <span className="font-mono text-slate-200">
-                  {formatDate(selectedRecord.created_at)}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between text-slate-400">
-                <span>Kategori Ground Truth:</span>
-                <span
-                  className={`font-bold ${
-                    selectedRecord.human_is_shrimp ? "text-emerald-400" : "text-rose-400"
-                  }`}
-                >
-                  {selectedRecord.human_is_shrimp ? "Objek Udang Asli" : "Bukan Udang (Null Image)"}
-                </span>
-              </div>
-
+            <form onSubmit={handleAdminLogin} className="space-y-3.5">
               <div className="space-y-1">
-                <span className="text-slate-400">Model Yang Disetujui Manusia:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {(selectedRecord.selected_models || []).length > 0 ? (
-                    (selectedRecord.selected_models || []).map((m) => (
-                      <span
-                        key={m}
-                        className="rounded-lg bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 text-emerald-300 text-[11px]"
-                      >
-                        {m}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-rose-400 italic">Semua model tidak disetujui (Salah)</span>
-                  )}
-                </div>
+                <label className="text-xs font-medium text-slate-300">Password Admin:</label>
+                <input
+                  type="password"
+                  value={adminLoginPasswordInput}
+                  onChange={(e) => setAdminLoginPasswordInput(e.target.value)}
+                  placeholder="Ketik password admin..."
+                  autoFocus
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:border-amber-400 focus:outline-none"
+                />
               </div>
 
-              {selectedRecord.notes && (
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 space-y-1">
-                  <span className="text-[11px] text-slate-400 font-semibold">Catatan Lapangan:</span>
-                  <p className="text-slate-200">{selectedRecord.notes}</p>
+              {adminLoginError && (
+                <div className="rounded-lg border border-rose-800/60 bg-rose-950/40 p-2 text-xs text-rose-300">
+                  {adminLoginError}
                 </div>
               )}
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsAdminLoginModalOpen(false)}
+                  className="w-full rounded-xl bg-slate-800 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-700"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isVerifyingAdmin}
+                  className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 py-2.5 text-xs font-bold text-slate-950 shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
+                >
+                  {isVerifyingAdmin ? "Memverifikasi..." : "Masuk Admin"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus Sampel Tertentu (Admin) */}
+      {deleteConfirmRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-rose-900/60 bg-slate-900 p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-rose-400">
+                <Trash2 className="h-4 w-4" />
+                Hapus Sampel Ini?
+              </div>
+              <button
+                onClick={() => setDeleteConfirmRecord(null)}
+                className="rounded-lg p-1 text-slate-400 hover:text-white bg-slate-800/80"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
-            {/* Modal Actions */}
+            <p className="text-xs text-slate-300">
+              Apakah Anda yakin ingin menghapus data sampel ini secara permanen dari database Supabase dan storage?
+            </p>
+
+            {deleteConfirmRecord.notes && (
+              <div className="rounded-lg bg-slate-950 p-2.5 text-[11px] text-slate-400 italic border border-slate-800">
+                &quot;{deleteConfirmRecord.notes}&quot;
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2 pt-2">
               <button
                 type="button"
-                onClick={() =>
-                  handleDownloadSingleImage(
-                    selectedRecord.image_url,
-                    selectedRecord.id || "image"
-                  )
-                }
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 py-2.5 text-xs font-semibold text-white"
+                onClick={() => setDeleteConfirmRecord(null)}
+                className="w-full rounded-xl bg-slate-800 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-700"
               >
-                <Download className="h-4 w-4" /> Download Foto Ini
+                Batal
               </button>
-
               <button
                 type="button"
-                onClick={() => setSelectedRecord(null)}
-                className="w-full rounded-xl bg-slate-800 py-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-700"
+                disabled={isDeletingSingle}
+                onClick={handleDeleteSingleRecord}
+                className="w-full rounded-xl bg-rose-600 hover:bg-rose-500 py-2.5 text-xs font-bold text-white shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
               >
-                Tutup
+                {isDeletingSingle ? "Menghapus..." : "Ya, Hapus Data"}
               </button>
             </div>
           </div>

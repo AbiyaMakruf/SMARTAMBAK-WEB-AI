@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Camera, RefreshCw, Image as ImageIcon, Sparkles, X, Check, ArrowDownUp } from "lucide-react";
+import { Camera, RefreshCw, Image as ImageIcon, Sparkles, X, Check, ArrowDownUp, Sliders } from "lucide-react";
 import { compressImage, formatBytes } from "@/lib/imageCompressor";
 
 interface CameraCaptureProps {
   onImageSelected: (file: File, previewUrl: string) => void;
+  onOpenEditor?: () => void;
   isProcessing?: boolean;
 }
 
-export function CameraCapture({ onImageSelected, isProcessing = false }: CameraCaptureProps) {
+export function CameraCapture({ onImageSelected, onOpenEditor, isProcessing = false }: CameraCaptureProps) {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [selectedPreview, setSelectedPreview] = useState<string | null>(null);
@@ -258,6 +259,19 @@ export function CameraCapture({ onImageSelected, isProcessing = false }: CameraC
                 %)
               </span>
             </div>
+          )}
+
+          {/* Action to trigger extreme simulation editor */}
+          {onOpenEditor && (
+            <button
+              type="button"
+              onClick={onOpenEditor}
+              disabled={isProcessing}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-slate-900 to-cyan-950/60 border border-cyan-700/60 hover:border-cyan-500 py-2.5 text-xs font-semibold text-cyan-300 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              <Sliders className="h-4 w-4 text-cyan-400" />
+              Simulasi Kondisi Ekstrem / Edit Gambar
+            </button>
           )}
         </div>
       ) : isCameraActive ? (

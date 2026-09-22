@@ -3,12 +3,12 @@ CREATE TABLE IF NOT EXISTS shrimp_predictions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   image_url TEXT NOT NULL,
-  model_1_output JSONB,
-  model_2_output JSONB,
-  model_3_output JSONB,
+  model_1_output JSONB, -- stores Ultralytics response + annotated_image_url + real_shrimp_count
+  model_2_output JSONB, -- stores Ultralytics response + annotated_image_url
+  model_3_output JSONB, -- stores Ultralytics response + annotated_image_url
   human_is_shrimp BOOLEAN NOT NULL,
   selected_models TEXT[] DEFAULT '{}',
-  notes TEXT
+  notes TEXT -- field notes, optionally prefixed with [Riil: X Udang]
 );
 
 -- Enable Row Level Security (RLS)

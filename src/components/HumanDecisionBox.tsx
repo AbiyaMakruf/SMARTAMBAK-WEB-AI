@@ -12,9 +12,12 @@ import {
   Sparkles,
   Layers,
   HelpCircle,
+  Hash,
+  Tag,
 } from "lucide-react";
 import { supabase, STORAGE_BUCKET } from "@/lib/supabase";
 import { SingleModelInferenceResult, ShrimpPredictionRecord } from "@/types/prediction";
+import { createAnnotatedBlob } from "@/lib/annotator";
 
 interface HumanDecisionBoxProps {
   imageFile: File | null;
@@ -37,6 +40,7 @@ export function HumanDecisionBox({
 }: HumanDecisionBoxProps) {
   // Ground truth: Is the real object a shrimp or non-shrimp (null image)?
   const [isShrimpGroundTruth, setIsShrimpGroundTruth] = useState<boolean>(true);
+  const [realShrimpCount, setRealShrimpCount] = useState<number | "">("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{
@@ -109,27 +113,105 @@ export function HumanDecisionBox({
       }
 
       let publicImageUrl = "";
+      const activeBucket = uploadResult.data?.fullPath ? STORAGE_BUCKET : "shrimp-images";
       if (!uploadResult.error) {
         const { data: publicUrlData } = supabase.storage
-          .from(uploadResult.data?.fullPath ? STORAGE_BUCKET : "shrimp-images")
+          .from(activeBucket)
           .getPublicUrl(filePath);
         publicImageUrl = publicUrlData.publicUrl;
       } else {
         publicImageUrl = imagePreviewUrl || `https://storage.placeholder/smartambak_${timestamp}.jpg`;
       }
 
-      // 2. Prepare payload
+      // 2. Pre-generate and upload annotated images for Model 1, 2, and 3
+      let model1ImgUrl: string | undefined;
+      let model2ImgUrl: string | undefined;
+      let model3ImgUrl: string | undefined;
+
+      if (imagePreviewUrl) {
+        try {
+          const [blob1, blob2, blob3] = await Promise.all([
+            createAnnotatedBlob(
+              imagePreviewUrl,
+              results["model_1"]?.data?.images?.[0]?.results || [],
+              "Model 1: Multiclass"
+            ),
+            createAnnotatedBlob(
+              imagePreviewUrl,
+              results["model_2"]?.data?.images?.[0]?.results || [],
+              "Model 2: Binaryclass"
+            ),
+            createAnnotatedBlob(
+              imagePreviewUrl,
+              results["model_3"]?.data?.images?.[0]?.results || [],
+              "Model 3: Baseline"
+            ),
+          ]);
+
+          if (blob1) {
+            const p1 = `annotated/${timestamp}_${randomStr}_model1.jpg`;
+            const up1 = await supabase.storage.from(activeBucket).upload(p1, blob1, { cacheControl: "3600" });
+            if (!up1.error) {
+              const { data } = supabase.storage.from(activeBucket).getPublicUrl(p1);
+              model1ImgUrl = data.publicUrl;
+            }
+          }
+          if (blob2) {
+            const p2 = `annotated/${timestamp}_${randomStr}_model2.jpg`;
+            const up2 = await supabase.storage.from(activeBucket).upload(p2, blob2, { cacheControl: "3600" });
+            if (!up2.error) {
+              const { data } = supabase.storage.from(activeBucket).getPublicUrl(p2);
+              model2ImgUrl = data.publicUrl;
+            }
+          }
+          if (blob3) {
+            const p3 = `annotated/${timestamp}_${randomStr}_model3.jpg`;
+            const up3 = await supabase.storage.from(activeBucket).upload(p3, blob3, { cacheControl: "3600" });
+            if (!up3.error) {
+              const { data } = supabase.storage.from(activeBucket).getPublicUrl(p3);
+              model3ImgUrl = data.publicUrl;
+            }
+          }
+        } catch (annotErr) {
+          console.warn("Annotated upload non-critical warning:", annotErr);
+        }
+      }
+
+      // 3. Format notes with real shrimp count prefix if provided
+      let formattedNotes = notes.trim();
+      if (isShrimpGroundTruth && realShrimpCount !== "") {
+        const prefix = `[Riil: ${realShrimpCount} Udang]`;
+        formattedNotes = formattedNotes ? `${prefix} ${formattedNotes}` : prefix;
+      }
+
+      // 4. Prepare payload (storing annotated URLs inside model outputs for schema safety)
       const recordPayload: ShrimpPredictionRecord = {
         image_url: publicImageUrl,
-        model_1_output: results["model_1"]?.data || null,
-        model_2_output: results["model_2"]?.data || null,
-        model_3_output: results["model_3"]?.data || null,
+        model_1_output: results["model_1"]?.data
+          ? {
+              ...results["model_1"]!.data,
+              annotated_image_url: model1ImgUrl,
+              real_shrimp_count: realShrimpCount !== "" ? Number(realShrimpCount) : undefined,
+            }
+          : null,
+        model_2_output: results["model_2"]?.data
+          ? {
+              ...results["model_2"]!.data,
+              annotated_image_url: model2ImgUrl,
+            }
+          : null,
+        model_3_output: results["model_3"]?.data
+          ? {
+              ...results["model_3"]!.data,
+              annotated_image_url: model3ImgUrl,
+            }
+          : null,
         human_is_shrimp: isShrimpGroundTruth,
         selected_models: selectedModels,
-        notes: notes.trim() || undefined,
+        notes: formattedNotes || undefined,
       };
 
-      // 3. Insert record to Supabase DB 'shrimp_predictions'
+      // 5. Insert record to Supabase DB 'shrimp_predictions'
       const { error: dbError } = await supabase.from("shrimp_predictions").insert([recordPayload]);
 
       if (dbError) {
@@ -142,6 +224,7 @@ export function HumanDecisionBox({
       });
 
       setNotes("");
+      setRealShrimpCount("");
 
       setTimeout(() => {
         onSuccessSubmit();
@@ -222,6 +305,92 @@ export function HumanDecisionBox({
               </span>
             )}
           </div>
+
+          {/* Ground Truth Shrimp Count (Optional) */}
+          {isShrimpGroundTruth && (
+            <div className="rounded-xl border border-cyan-800/50 bg-slate-950/80 p-3 space-y-2 mt-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                  <Hash className="h-3.5 w-3.5 text-cyan-400" />
+                  Jumlah Udang Riil di Lapangan (Ground Truth Count):
+                </label>
+                <span className="text-[10px] text-cyan-400 font-mono">
+                  {realShrimpCount !== "" ? `${realShrimpCount} Ekor` : "Opsional"}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={realShrimpCount}
+                  onChange={(e) =>
+                    setRealShrimpCount(e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value) || 1))
+                  }
+                  placeholder="Ketik jumlah udang sebenarnya, misal: 5"
+                  className="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                />
+                <div className="flex gap-1">
+                  {[1, 2, 3, 5, 10].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setRealShrimpCount(num)}
+                      className={`px-2 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                        realShrimpCount === num
+                          ? "bg-cyan-500/25 text-cyan-300 border-cyan-400"
+                          : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                  {realShrimpCount !== "" && (
+                    <button
+                      type="button"
+                      onClick={() => setRealShrimpCount("")}
+                      className="px-2 py-1.5 text-xs text-rose-400 hover:text-rose-300 rounded-lg border border-rose-900/40 bg-rose-950/30"
+                      title="Hapus filter hitungan"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Live Discrepancy Indicator */}
+              {realShrimpCount !== "" && (
+                <div className="space-y-1 text-[11px] pt-1">
+                  <span className="text-slate-400 font-medium">Analisis Selisih Bounding Box:</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                    {models.map((m) => {
+                      const count = getBoxCount(m.result);
+                      const diff = count - Number(realShrimpCount);
+                      const isExact = diff === 0;
+                      return (
+                        <div
+                          key={m.id}
+                          className={`rounded-lg p-2 border text-[11px] flex items-center justify-between ${
+                            isExact
+                              ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
+                              : diff < 0
+                              ? "bg-amber-950/40 border-amber-800/60 text-amber-300"
+                              : "bg-rose-950/40 border-rose-800/60 text-rose-300"
+                          }`}
+                        >
+                          <span className="font-semibold">{m.id.replace("model_", "Model ")}: {count} Box</span>
+                          <span className="font-medium">
+                            {isExact ? "✓ Pas" : diff < 0 ? `Kurang ${Math.abs(diff)}` : `Lebih +${diff}`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Step 2: Per-Model Accuracy Checkboxes with Dynamic Diagnosis */}
@@ -323,15 +492,40 @@ export function HumanDecisionBox({
           </div>
         </div>
 
-        {/* Step 3: Optional Notes */}
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-            <FileText className="h-3.5 w-3.5 text-slate-400" /> Catatan Sampel / Pengujian (Opsional)
-          </label>
+        {/* Step 3: Optional Notes with Quick Tags */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5 text-slate-400" /> Catatan Sampel / Pengujian (Opsional)
+            </label>
+            <span className="text-[10px] text-slate-500">Klik tag cepat di bawah:</span>
+          </div>
+
+          {/* Quick preset tags */}
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              "Jumlah box tidak sesuai",
+              "Udang bertumpuk",
+              "False positive pada lumut/gelembung",
+              "Air kolam keruh",
+              "Silau terik matahari",
+              "Minim cahaya / gelap",
+            ].map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setNotes((prev) => (prev.trim() ? `${prev.trim()}, ${tag}` : tag))}
+                className="rounded-lg bg-slate-950/80 border border-slate-800 hover:border-cyan-700/60 hover:text-cyan-300 px-2 py-1 text-[10px] text-slate-400 transition-colors"
+              >
+                + {tag}
+              </button>
+            ))}
+          </div>
+
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Contoh: Pengujian null image dengan foto lumut tambak, model 1 sempat mendeteksi wssv..."
+            placeholder="Contoh: Total ada 5 udang tapi model hanya mendeteksi 4 box, 1 udang tidak terdeteksi karena tertutup lumpur..."
             rows={2}
             className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
           ></textarea>

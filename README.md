@@ -23,26 +23,31 @@ Aplikasi web *mobile-friendly* modern berbasis **Next.js 14 (App Router)**, **Ta
   2. **Model 2 (Binaryclass)**: Klasifikasi cepat kondisi umum (*Sehat vs Sakit*).
   3. **Model 3 (Baseline / Old Model)**: Model acuan historis.
 - **Mekanisme Multi-Key & Auto-Fallback**: Server otomatis melakukan *retry* dengan kunci alternatif jika terjadi error HTTP 401 Unauthorized.
-- **Visualisasi Hasil**: Bounding box SVG dinamis berskala ternormalisasi, badge warna tematik per penyakit, dan indikator latensi inferensi (*speed* dalam ms).
+- **Simulasi Kondisi Ekstrem / Edit Gambar**:
+  - Slider kecerahan (*brightness* -80% s/d +80%), kontras, saturasi, dan kekeruhan air tambak (*pond turbidity*).
+  - Preset cepat: *Normal*, *Malam / Gelap*, *Silau Terik*, *Air Keruh*, dan *Kontras Tinggi* untuk menguji ketahanan model pada *edge cases*.
+- **Visualisasi Hasil**: Bounding box SVG/Canvas dinamis berskala ternormalisasi, badge warna tematik per penyakit, dan indikator latensi inferensi (*speed* dalam ms).
 
-### 3. Human Verification & Ground Truth Box
+### 3. Human Verification, Ground Truth Count, & Catatan Lapangan
 - **Alur Pasca-Deteksi**: Form evaluasi cerdas hanya muncul setelah model selesai menganalisis gambar.
-- **Klasifikasi Objek**:
-  - **Udang Asli (Positive Sample)** $\rightarrow$ Menilai True Positive (Akurat) vs False Negative (Luput).
-  - **Bukan Udang (Null/Negative Sample)** $\rightarrow$ Menilai True Negative (Akurat / Bersih) vs False Positive (Salah Deteksi).
-- **Simpan ke Server**: Mengunggah foto ke Supabase Storage (`smartambak`) dan menyimpan log ke tabel `shrimp_predictions`.
+- **Klasifikasi Objek & Jumlah Udang Riil**:
+  - **Udang Asli (Positive Sample)**: Dilengkapi input jumlah udang riil di lapangan (Ground Truth Count) dan diagnosis selisih bounding box (apakah model kurang atau lebih box).
+  - **Bukan Udang (Null/Negative Sample)**: Mengidentifikasi True Negative vs False Positive.
+- **Catatan Tambahan & Tag Cepat**: Teknisi lapangan dapat memilih tag cepat (*Jumlah box tidak sesuai, Udang bertumpuk, False positive lumut, Air keruh*) atau mengisi catatan manual.
+- **Simpan ke Server**: Mengunggah foto asli dan foto beranotasi ke Supabase Storage (`smartambak`) serta menyimpan log ke tabel `shrimp_predictions`.
 
-### 4. Laporan, Analitik & Ekspor Dataset YOLO (`/report`)
-- **Metrik Komprehensif**: Total sampel, rasio Udang vs Null Images, jumlah kesalahan (*Error count*) per model, dan *False Positive count*.
-- **Grafik Dinamis**:
-  - 📊 Stacked bar chart komparasi akurasi vs tingkat kesalahan antar 3 model.
-  - ⚡ Visualisasi waktu inferensi (Cloud Run latency dalam ms).
-  - 🏷️ Distribusi diagnosis kelas penyakit.
+### 4. Laporan, Analitik, Mode Admin & Ekspor Dataset YOLO (`/report`)
+- **Akses Mode Admin & Hapus Sampel Tertentu**:
+  - Login Admin dengan password `Abiyajr11`.
+  - Mengaktifkan izin menghapus sampel gambar individual secara permanen dari database dan storage.
+- **Tampilan Ulang 4 Gambar (Asli + Model AI 1, 2, 3)**:
+  - Tab visualisasi interaktif di modal detail: `[Foto Asli]`, `[Model 1: Multiclass]`, `[Model 2: Binary]`, dan `[Model 3: Baseline]`.
+  - Rendering canvas bounding box dinamis dan tombol unduh per visualisasi hasil AI.
+- **Metrik Komprehensif & Grafik Dinamis**: Total sampel, rasio Udang vs Null Images, Error count per model, stacked bar chart, dan waktu inferensi.
 - **1-Klik Ekspor Dataset YOLO Null Images**:
-  - Mengunduh seluruh gambar non-udang / salah deteksi ke dalam arsip `.zip`.
-  - Berisi folder `images/`, folder `labels/` dengan file `.txt` kosong (standar resmi Ultralytics YOLO untuk *background training*), `dataset.yaml`, dan panduan CLI untuk *fine-tuning* model.
-- **Reset Data Terproteksi Password**:
-  - Tombol reset dengan otentikasi password admin (`Abiyajr11`) untuk membersihkan data pengujian.
+  - Mengunduh seluruh gambar non-udang / salah deteksi ke dalam arsip `.zip` berstandar Ultralytics YOLO (`images/`, `labels/` kosong, `dataset.yaml`).
+- **Reset Seluruh Data Terproteksi Password**:
+  - Tombol reset seluruh data database dengan proteksi kata sandi admin (`Abiyajr11`).
 
 ---
 

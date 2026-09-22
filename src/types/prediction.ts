@@ -43,6 +43,8 @@ export interface UltralyticsResponse {
   metadata?: ModelMetadata;
   networkTime?: number;
   error?: string;
+  annotated_image_url?: string;
+  real_shrimp_count?: number;
 }
 
 export interface SingleModelInferenceResult {
@@ -62,8 +64,12 @@ export interface ShrimpPredictionRecord {
   model_1_output: UltralyticsResponse | null;
   model_2_output: UltralyticsResponse | null;
   model_3_output: UltralyticsResponse | null;
+  model_1_image_url?: string;
+  model_2_image_url?: string;
+  model_3_image_url?: string;
   human_is_shrimp: boolean;
   selected_models: string[]; // e.g. ["model_1", "model_2"]
+  real_shrimp_count?: number;
   notes?: string;
 }
 

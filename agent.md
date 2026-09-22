@@ -36,28 +36,33 @@ website-ai-smartambak/
 ├── src/
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── predict/route.ts      # Proxy inferensi paralel 3 model & multi-key fallback
-│   │   │   └── report/reset/route.ts # Endpoint reset data terproteksi password "Abiyajr11"
-│   │   ├── globals.css               # Styling global & mobile safe-area
-│   │   ├── layout.tsx                # Mobile root layout & meta viewport
-│   │   ├── page.tsx                  # Halaman deteksi utama & alur verifikasi
-│   │   └── report/page.tsx           # Dashboard analitik, chart dinamis, filter, 1-klik YOLO zip
+│   │   │   ├── predict/route.ts          # Proxy inferensi paralel 3 model & multi-key fallback
+│   │   │   ├── report/delete/route.ts    # Endpoint hapus sampel tertentu (Password "Abiyajr11")
+│   │   │   ├── report/reset/route.ts     # Endpoint reset seluruh data (Password "Abiyajr11")
+│   │   │   └── report/verify-admin/route.ts # Endpoint verifikasi password admin
+│   │   ├── globals.css                   # Styling global & mobile safe-area
+│   │   ├── layout.tsx                    # Mobile root layout & meta viewport
+│   │   ├── page.tsx                      # Halaman deteksi utama & alur verifikasi
+│   │   └── report/page.tsx               # Dashboard analitik, chart dinamis, admin mode, filter
 │   ├── components/
-│   │   ├── CameraCapture.tsx         # Kamera live Safari iOS (WYSIWYG 1:1) & galeri
-│   │   ├── HumanDecisionBox.tsx      # Form ground-truth udang vs null & auto-suggestion
-│   │   ├── ModelResultCard.tsx       # Kartu output model AI & bounding box overlay
-│   │   └── Navbar.tsx                # Header & bottom navigation mobile
+│   │   ├── CameraCapture.tsx             # Kamera live Safari iOS (WYSIWYG 1:1) & galeri
+│   │   ├── HumanDecisionBox.tsx          # Form ground-truth udang vs null, real count, & tags
+│   │   ├── ImageEditorModal.tsx          # Simulasi kondisi ekstrem (kecerahan, kontras, keruh)
+│   │   ├── ModelResultCard.tsx           # Kartu output model AI & bounding box overlay
+│   │   ├── Navbar.tsx                    # Header & bottom navigation mobile
+│   │   └── SampleDetailModal.tsx         # Visualizer 4-gambar (Asli, AI 1, 2, 3), canvas render
 │   ├── lib/
-│   │   ├── imageCompressor.ts        # Client-side canvas compression (max 1280px, 85% JPEG)
-│   │   └── supabase.ts               # Inisialisasi Supabase client & admin
+│   │   ├── annotator.ts                  # Render bounding box ke Canvas & export JPEG blob
+│   │   ├── imageCompressor.ts            # Client-side canvas compression (max 1280px, 85% JPEG)
+│   │   └── supabase.ts                   # Inisialisasi Supabase client & admin
 │   └── types/
-│       └── prediction.ts             # Tipe TypeScript (Ultralytics response, DB schema, stats)
+│       └── prediction.ts                 # Tipe TypeScript (Ultralytics response, DB schema, stats)
 ├── supabase/
-│   └── schema.sql                    # Skema SQL tabel shrimp_predictions & RLS policies
-├── env.zip                           # Backup terenkripsi .env.local (Password: "Yiis5413", Hint: "Yii***")
-├── .env.example                      # Template variabel lingkungan
-├── agent.md                          # Dokumen panduan AI Agent ini
-└── README.md                         # Dokumentasi publik proyek
+│   └── schema.sql                        # Skema SQL tabel shrimp_predictions & RLS policies
+├── env.zip                               # Backup terenkripsi .env.local (Password: "Yiis5413", Hint: "Yii***")
+├── .env.example                          # Template variabel lingkungan
+├── agent.md                              # Dokumen panduan AI Agent ini
+└── README.md                             # Dokumentasi publik proyek
 ```
 
 ---
@@ -96,36 +101,56 @@ Diimplementasikan di `src/components/CameraCapture.tsx`:
 
 ---
 
-## 6. Logika Ground Truth & Evaluasi Pasca-Inferensi
+## 6. Logika Ground Truth, Real Count, & Catatan Lapangan
 
 Diimplementasikan di `src/components/HumanDecisionBox.tsx`:
 - Box evaluasi **hanya muncul setelah seluruh model selesai inferensi**.
-- Pertanyaan Ground Truth:
+- **Ground Truth Target**:
   - **Udang Asli**: Diharapkan ada bounding box ($\ge 1$). Jika ada $\rightarrow$ True Positive (Akurat). Jika 0 box $\rightarrow$ False Negative (Luput).
   - **Bukan Udang (Null Image)**: Diharapkan 0 bounding box. Jika 0 box $\rightarrow$ True Negative (Akurat). Jika muncul box $\rightarrow$ **False Positive (Salah Deteksi)**.
-- Foto-foto yang tergolong *False Positive* atau *Null Image* otomatis ditandai untuk kebutuhan pelatihan *background dataset*.
+- **Jumlah Udang Sebenarnya (Real Count)**:
+  - Teknisi lapangan dapat mengisi jumlah udang riil (misal: 5 ekor).
+  - Sistem menampilkan diagnosis selisih bounding box secara real-time: apakah model kekurangan box atau kelebihan box.
+- **Preset Catatan Cepat**:
+  - Tombol tag cepat (`+ Jumlah box tidak sesuai`, `+ Udang bertumpuk`, `+ False positive pada lumut/gelembung`, `+ Air keruh`, `+ Silau terik`).
+  - Disimpan dengan format `[Riil: X Udang] <catatan>` di kolom `notes` serta di dalam metadata `model_1_output.real_shrimp_count`.
 
 ---
 
-## 7. Dashboard Analitik & Ekspor Dataset YOLO (`src/app/report/page.tsx`)
+## 7. Fitur Simulasi Kondisi Ekstrem / Edit Gambar (`src/components/ImageEditorModal.tsx`)
 
-1. **Metrik & Grafik**:
-   - Confusion matrix count (True Positive, True Negative, False Positive, False Negative).
-   - Per-model Error Count & Accuracy %.
-   - Per-model Average Latency Speed (ms).
-   - Stacked dynamic bar chart & latency bar chart.
-2. **1-Klik Ekspor Dataset YOLO Null Images**:
+- Memungkinkan pengguna menguji ketahanan model pada skenario lapangan ekstrem sebelum diinferensi:
+  - **Brightness (Kecerahan)**: -80% s/d +80% (menguji minim cahaya malam vs silau matahari).
+  - **Contrast (Kontras)**: -60% s/d +80% (menguji bayangan keras & kontras tinggi).
+  - **Saturation (Saturasi)**: -80% s/d +80%.
+  - **Pond Turbidity (Kekeruhan Air Kolam)**: Simulasi air tambak berwarna kecokelatan/keruh dan berkabut.
+  - **Preset Cepat**: Normal, Malam / Gelap, Silau Terik, Air Keruh, dan Kontras Tinggi.
+- Menggunakan HTML5 Canvas filter dan menghasilkan file baru yang langsung diinferensi ulang ke 3 model AI.
+
+---
+
+## 8. Dashboard Laporan, Mode Admin, & Visualizer 4-Gambar (`src/app/report/page.tsx`)
+
+1. **Akses Mode Admin & Hapus Sampel Tertentu**:
+   - Password Admin: `Abiyajr11` (sama dengan password reset seluruh data).
+   - Verifikasi melalui endpoint `POST /api/report/verify-admin`. Status login disimpan di `sessionStorage`.
+   - Menampilkan badge "Admin Aktif" dan tombol hapus individual (`🗑️ Hapus`) per sampel di kartu daftar dan modal detail.
+   - Endpoint penghapusan single record: `POST /api/report/delete` (menghapus baris DB dan file di Supabase Storage).
+2. **Visualisasi Ulang 4 Gambar (Asli + Model AI 1, 2, 3)**:
+   - Diimplementasikan di `src/components/SampleDetailModal.tsx`.
+   - Menggunakan helper `src/lib/annotator.ts` untuk merender canvas beranotasi bounding box dinamis (bekerja untuk semua sampel baru maupun riwayat lama).
+   - Tab interaktif: `[Foto Asli]`, `[Model 1: Multiclass]`, `[Model 2: Binary]`, `[Model 3: Baseline]`.
+   - Tombol download dinamis: mengunduh foto asli atau foto hasil anotasi AI model yang sedang aktif dalam format JPEG.
+3. **1-Klik Ekspor Dataset YOLO Null Images**:
    - Mengemas seluruh gambar non-udang / salah deteksi ke file `.zip`.
    - Otomatis membuatkan file `.txt` kosong di folder `labels/` (format standar YOLO Ultralytics untuk background images).
    - Menyertakan file `dataset.yaml` dan panduan perintah CLI training.
-3. **Fitur Reset Database Terproteksi Password**:
-   - Endpoint: `POST /api/report/reset`
-   - Password: `Abiyajr11`
-   - Menghapus seluruh rekaman dari tabel Supabase `shrimp_predictions` menggunakan service role admin.
+4. **Fitur Reset Seluruh Database Terproteksi Password**:
+   - Endpoint: `POST /api/report/reset` (Password: `Abiyajr11`).
 
 ---
 
-## 8. Supabase Database & Storage
+## 9. Supabase Database & Storage
 
 - **Instance URL**: `https://pkzqlpbhvuiezesstlmz.supabase.co`
 - **Storage Bucket**: `smartambak` (Public)
@@ -134,7 +159,7 @@ Diimplementasikan di `src/components/HumanDecisionBox.tsx`:
 
 ---
 
-## 9. Penanganan Kredensial & Environment Variables
+## 10. Penanganan Kredensial & Environment Variables
 
 - File `.env.local` disimpan dalam arsip zip terenkripsi:
   - **File**: `env.zip`

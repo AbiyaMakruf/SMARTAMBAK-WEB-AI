@@ -4,12 +4,14 @@ import React, { useState, useCallback } from "react";
 import { CameraCapture } from "@/components/CameraCapture";
 import { ModelResultCard } from "@/components/ModelResultCard";
 import { HumanDecisionBox } from "@/components/HumanDecisionBox";
+import { ImageEditorModal } from "@/components/ImageEditorModal";
 import { SingleModelInferenceResult } from "@/types/prediction";
-import { Sparkles, Activity, Layers, RotateCcw, ShieldCheck, Cpu } from "lucide-react";
+import { Sparkles, Activity, Layers, RotateCcw, ShieldCheck, Cpu, Sliders } from "lucide-react";
 
 export default function Home() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
 
   // Model states
   const [results, setResults] = useState<Record<string, SingleModelInferenceResult | null>>({
@@ -103,6 +105,13 @@ export default function Home() {
     );
   }, []);
 
+  // When an image is edited / simulated
+  const handleApplyEditedImage = (editedFile: File, editedPreviewUrl: string) => {
+    setImageFile(editedFile);
+    setImagePreviewUrl(editedPreviewUrl);
+    runInference(editedFile);
+  };
+
   // When a new image is selected/captured
   const handleImageSelected = (file: File, previewUrl: string) => {
     setImageFile(file);
@@ -121,6 +130,7 @@ export default function Home() {
   const handleResetAll = () => {
     setImageFile(null);
     setImagePreviewUrl(null);
+    setIsEditorOpen(false);
     setResults({
       model_1: null,
       model_2: null,
@@ -153,19 +163,42 @@ export default function Home() {
             </p>
           </div>
           {imageFile && (
-            <button
-              onClick={handleResetAll}
-              disabled={isAnyLoading}
-              className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800/60 rounded-lg px-2.5 py-1.5 border border-slate-700/60 disabled:opacity-50"
-            >
-              <RotateCcw className="h-3 w-3" /> Reset
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setIsEditorOpen(true)}
+                disabled={isAnyLoading}
+                className="flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-200 bg-cyan-950/60 rounded-lg px-2.5 py-1.5 border border-cyan-800/60 disabled:opacity-50"
+                title="Simulasi kondisi ekstrem (malam, terik, air keruh)"
+              >
+                <Sliders className="h-3 w-3 text-cyan-400" /> Simulasi
+              </button>
+              <button
+                onClick={handleResetAll}
+                disabled={isAnyLoading}
+                className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800/60 rounded-lg px-2.5 py-1.5 border border-slate-700/60 disabled:opacity-50"
+              >
+                <RotateCcw className="h-3 w-3" /> Reset
+              </button>
+            </div>
           )}
         </div>
       </div>
 
       {/* Step 1: Image Capture / Upload */}
-      <CameraCapture onImageSelected={handleImageSelected} isProcessing={isAnyLoading} />
+      <CameraCapture
+        onImageSelected={handleImageSelected}
+        onOpenEditor={() => setIsEditorOpen(true)}
+        isProcessing={isAnyLoading}
+      />
+
+      {/* Image Editor Modal for Extreme Simulation */}
+      <ImageEditorModal
+        isOpen={isEditorOpen}
+        onClose={() => setIsEditorOpen(false)}
+        originalFile={imageFile}
+        originalPreviewUrl={imagePreviewUrl}
+        onApply={handleApplyEditedImage}
+      />
 
       {/* Step 2: 3 Model Output Visualization */}
       <div className="space-y-3">
