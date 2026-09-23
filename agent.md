@@ -74,10 +74,10 @@ website-ai-smartambak/
 
 Endpoint model berjalan di Google Cloud Run:
 1. **Model 1 (Multiclass - Penyakit Spesifik)**:
-   - Endpoint: `https://predict-6aaf79e0866ab0ecc4f0c857-dproatj77a-et.a.run.app`
+   - Endpoint: `https://predict-6ab3fedd1e05d96795884b28-dproatj77a-et.a.run.app`
    - Kelas deteksi: `['IMNV', 'WFD', 'blackgill', 'healthy', 'wssv', 'wssv_bg', 'yellowhead']`
 2. **Model 2 (Binaryclass - Sehat vs Sakit)**:
-   - Endpoint: `https://predict-6aaf79c7d652d8bbb378ed0c-dproatj77a-et.a.run.app`
+   - Endpoint: `https://predict-6ab3fee4cb033e32d1ef6cb2-dproatj77a-et.a.run.app`
 3. **Model 3 (Baseline / Old Model)**:
    - Endpoint: `https://predict-6a0e0767af1f97748662-dproatj77a-et.a.run.app`
 
