@@ -6,10 +6,17 @@ export const metadata: Metadata = {
   title: "Smart Ambak AI - Deteksi Penyakit Udang",
   description: "Aplikasi deteksi penyakit udang tambak dengan komparasi 3 model AI Ultralytics dan validasi manusia.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Smart Ambak AI",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
 };
 

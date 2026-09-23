@@ -51,12 +51,17 @@ Aplikasi web *mobile-friendly* modern berbasis **Next.js 14 (App Router)**, **Ta
 
 ### 5. Suite Uji Beban & Analisis Konkurensi AI (`/admin/load-test`)
 - **Autentikasi Terproteksi Admin** (`Abiyajr11`): Menguji batas throughput dan ketahanan Cloud Run.
-- **Targeting Fleksibel**: Uji Model 1, Model 2, Model 3, atau seluruh model secara paralel.
+- **Pilihan Citra Uji Beban**: Pengguna dapat mengunggah foto udang/tambak riil sendiri atau menggunakan canvas sintetis bawaan.
+- **Kalkulasi Konkurensi Riil**: Pengaturan fleksibel *Concurrent Users* (1–30) × *Permintaan per User* (1–100) = Total Permintaan Terhitung (misal: 30 user × 100 req = 3.000 requests).
 - **2 Mode Pengujian**:
-  - *Fixed Concurrency*: 1–30 concurrent users dengan 5–100 total requests.
-  - *Step-Up Ladder Test*: 1 ➔ 3 ➔ 5 ➔ 10 ➔ 20 concurrent users otomatis untuk melihat kurva kenaikan latensi.
+  - *Fixed Concurrency*: Uji beban paralel konstan per virtual worker.
+  - *Step-Up Ladder Test*: Eskalasi bertahap 1 ➔ 3 ➔ 5 ➔ 10 ➔ 20 concurrent users otomatis untuk melihat kurva kenaikan latensi.
+- **Grafik Tren Latensi Vektor (SVG)**: Visualisasi timeline latensi interaktif anti-collapse dengan garis batas rata-rata dan P95.
 - **Metrik Kinerja Real-Time**: RPS throughput, waktu respon Avg / Min / Max / P50 / P95, success rate, dan deteksi cold-start otomatis.
-- **Ekspor Laporan JSON**: Unduh rekaman pengujian beban dengan 1-klik untuk dokumentasi teknis.
+- **Ekspor Laporan Multi-Format**:
+  - **Ekspor PDF Resmi**: Menghasilkan dokumen laporan format `.pdf` berstandar formal (menggunakan `jsPDF`).
+  - **Cetak / PDF Browser**: Mode print layout teroptimasi via `window.print()`.
+  - **Ekspor JSON**: Unduh file raw data `.json`.
 
 ---
 

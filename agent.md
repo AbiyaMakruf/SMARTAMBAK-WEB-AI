@@ -151,18 +151,23 @@ Halaman khusus pengujian performa endpoint Cloud Run dan throughput inferensi:
   - `model_2` (Binaryclass)
   - `model_3` (Baseline)
   - `all` (Inferensi 3 model secara simultan via proxy `/api/predict`)
-- **2 Mode Pengujian Beban**:
-  1. **Fixed Concurrency Mode**: Menguji sejumlah *concurrent users* tetap (1 s/d 30) dengan total request tertentu (5 s/d 100).
-  2. **Step-Up Ladder Test Mode**: Bertahap menaikkan konkurensi (1 ➔ 3 ➔ 5 ➔ 10 ➔ 20 concurrent users) untuk mengukur kurva degradasi waktu respon (apakah makin banyak request makin lambat).
-- **Synthetic Image Payload**: Menghasilkan gambar kanvas uji berukuran realistis secara instan tanpa membebani storage Supabase.
-- **Client-Side Worker Pool Runner**: Menjalankan *batch request* secara konkruen dengan kontrol pembatalan instan (`AbortController`).
-- **Analisis & Metrik Lengkap**:
-  - Total Selesai, Success Rate (%), Throughput (RPS - Requests Per Second).
-  - Distribusi Latensi: Rata-rata (Avg), Min, Max, P50 (Median), dan P95 (Tail Latency).
-  - Visualisasi timeline latensi interaktif dan grafik bar Step-Up Concurrency vs Latency.
-  - Log request mendetail dengan kode HTTP, latensi per request, dan filter status.
-  - **Diagnostik AI Otomatis**: Mendeteksi *cold start*, mengukur degradasi latensi di bawah beban, dan memberikan evaluasi kesiapan produksi Cloud Run.
-  - **Ekspor Laporan JSON**: Mengunduh rekaman hasil uji beban untuk dokumentasi teknis atau laporan kapasitas infrastruktur.
+- **Pilihan Citra Uji Beban (Image Payload)**:
+  - **Unggah Foto Sendiri**: Pengguna dapat memilih gambar udang / tambak riil dari galeri atau komputer (JPG, PNG, WebP) dengan thumbnail pratinjau dan informasi ukuran KB.
+  - **Gambar Sintetis Bawaan**: Canvas udang sintetis 640x640 otomatis.
+- **Kalkulasi & Skenario Beban**:
+  1. **Fixed Concurrency Mode**:
+     - Pengguna menentukan **Concurrent Users** ($1 - 30$ user) dan **Permintaan per User** ($1 - 100$ req/user).
+     - Total request terhitung dinamis: $\text{Total} = \text{Concurrency} \times \text{Requests per User}$ (contoh: 30 user $\times$ 100 req = 3.000 total request).
+     - Tombol preset cepat: $3\times5$ (15), $5\times10$ (50), $10\times10$ (100), $30\times100$ (3.000).
+  2. **Step-Up Ladder Test Mode**: Bertahap menaikkan konkurensi (1 ➔ 3 ➔ 5 ➔ 10 ➔ 20 concurrent users) untuk mengukur kurva degradasi waktu respon.
+- **Client-Side Worker Pool Runner**: Menjalankan batch request per virtual user secara konkruen dengan kontrol pembatalan instan (`AbortController`).
+- **Visualisasi Tren Latensi Vektor (SVG)**:
+  - Bagan SVG interaktif anti-collapse dengan grid horisontal, garis referensi rata-rata (cyan), dan tail latency P95 (amber).
+  - Hover / sentuh bar/titik untuk inspeksi langsung: ID request, Virtual User ID, status HTTP, dan latensi ms.
+- **Ekspor Dokumen Laporan**:
+  - **Ekspor PDF Resmi**: Menghasilkan dokumen PDF multi-halaman berformat resmi menggunakan `jsPDF` (berisi konfigurasi, KPI summary, diagnostik Cold Start Cloud Run, dan tabel log riwayat).
+  - **Cetak / PDF Browser**: Mode print browser teroptimasi via `window.print()`.
+  - **Ekspor JSON**: Unduh file raw data `.json` untuk integrasi data telemetri.
 
 ---
 
