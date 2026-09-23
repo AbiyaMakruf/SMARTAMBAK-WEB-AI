@@ -527,8 +527,8 @@ export default function LoadTestPage() {
     URL.revokeObjectURL(url);
   };
 
-  // Download official test report PDF via jsPDF
-  const handleExportPdf = () => {
+  // Download official test report PDF via jsPDF with embedded visual chart and full log records
+  const handleExportPdf = async () => {
     try {
       const doc = new jsPDF({
         orientation: "portrait",
@@ -578,7 +578,7 @@ export default function LoadTestPage() {
       doc.text(statusText, pageWidth - 52, 14.5);
 
       // Section 1: Konfigurasi Uji
-      let yPos = 35;
+      let yPos = 34;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.setTextColor(30, 41, 59);
@@ -604,7 +604,7 @@ export default function LoadTestPage() {
       doc.text(`• Citra Pengujian: ${imgInfo}`, 105, yPos + 11);
       doc.text(`• Target Model: ${targetModel === "all" ? "3 Model Paralel" : targetModel}`, 105, yPos + 16);
 
-      yPos += 28;
+      yPos += 27;
 
       // Section 2: Ringkasan Metrik KPI
       doc.setFont("helvetica", "bold");
@@ -623,12 +623,12 @@ export default function LoadTestPage() {
       ];
 
       const boxW = (pageWidth - 28 - 10) / 3;
-      const boxH = 16;
+      const boxH = 15;
       kpiBoxes.forEach((b, idx) => {
         const col = idx % 3;
         const row = Math.floor(idx / 3);
         const bx = 14 + col * (boxW + 5);
-        const by = yPos + row * (boxH + 3);
+        const by = yPos + row * (boxH + 2.5);
 
         doc.setFillColor(241, 245, 249);
         doc.setDrawColor(203, 213, 225);
@@ -637,92 +637,187 @@ export default function LoadTestPage() {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
         doc.setTextColor(100, 116, 139);
-        doc.text(b.label, bx + 3, by + 4.5);
+        doc.text(b.label, bx + 3, by + 4);
 
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
+        doc.setFontSize(10.5);
         doc.setTextColor(15, 23, 42);
-        doc.text(b.val, bx + 3, by + 10);
+        doc.text(b.val, bx + 3, by + 9.5);
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(6.5);
         doc.setTextColor(100, 116, 139);
-        doc.text(b.sub, bx + 3, by + 14);
+        doc.text(b.sub, bx + 3, by + 13.5);
       });
 
-      yPos += 2 * (boxH + 3) + 7;
+      yPos += 2 * (boxH + 2.5) + 6;
 
-      // Section 3: Diagnostik AI Cloud Run
+      // Section 3: Visualisasi Grafik Tren Latensi Timeline
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(30, 41, 59);
+      doc.text("3. VISUALISASI GRAFIK TREN LATENSI (TIMELINE CHART)", 14, yPos);
+      yPos += 3.5;
+
+      let chartRendered = false;
+      const svgEl = document.getElementById("latency-svg-chart");
+      if (svgEl) {
+        try {
+          let svgXml = new XMLSerializer().serializeToString(svgEl);
+          if (!svgXml.includes("xmlns=")) {
+            svgXml = svgXml.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+          }
+          const svgBlob = new Blob([svgXml], { type: "image/svg+xml;charset=utf-8" });
+          const blobUrl = URL.createObjectURL(svgBlob);
+          const img = new Image();
+          const loaded = await new Promise<boolean>((resolve) => {
+            img.onload = () => resolve(true);
+            img.onerror = () => resolve(false);
+            img.src = blobUrl;
+          });
+
+          if (loaded) {
+            const canvas = document.createElement("canvas");
+            canvas.width = 1400;
+            canvas.height = 360;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              ctx.fillStyle = "#020617";
+              ctx.fillRect(0, 0, 1400, 360);
+              ctx.drawImage(img, 0, 0, 1400, 360);
+              const chartDataUrl = canvas.toDataURL("image/png");
+              doc.addImage(chartDataUrl, "PNG", 14, yPos, pageWidth - 28, 44);
+              chartRendered = true;
+            }
+          }
+          URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+          console.warn("SVG to image canvas error:", err);
+        }
+      }
+
+      // Vector fallback in case image conversion was not possible
+      if (!chartRendered) {
+        const cX = 14;
+        const cY = yPos;
+        const cW = pageWidth - 28;
+        const cH = 44;
+        const pL = 14;
+        const pR = 10;
+        const pT = 6;
+        const pB = 8;
+        const plW = cW - pL - pR;
+        const plH = cH - pT - pB;
+        const maxLimit = Math.max(metrics.maxLatency, 1000) * 1.15;
+
+        // Dark background
+        doc.setFillColor(2, 6, 23);
+        doc.roundedRect(cX, cY, cW, cH, 1.5, 1.5, "F");
+
+        // Grid lines
+        doc.setDrawColor(30, 41, 59);
+        doc.line(cX + pL, cY + pT, cX + pL + plW, cY + pT);
+        doc.line(cX + pL, cY + pT + plH / 2, cX + pL + plW, cY + pT + plH / 2);
+        doc.line(cX + pL, cY + pT + plH, cX + pL + plW, cY + pT + plH);
+
+        // Reference lines
+        if (metrics.avgLatency > 0) {
+          const avgY = cY + pT + plH - (metrics.avgLatency / maxLimit) * plH;
+          doc.setDrawColor(6, 182, 212);
+          doc.line(cX + pL, avgY, cX + pL + plW, avgY);
+          doc.setFontSize(6.5);
+          doc.setTextColor(6, 182, 212);
+          doc.text(`Avg: ${metrics.avgLatency}ms`, cX + pL + plW - 22, avgY - 1);
+        }
+
+        if (metrics.p95 > 0) {
+          const p95Y = cY + pT + plH - (metrics.p95 / maxLimit) * plH;
+          doc.setDrawColor(245, 158, 11);
+          doc.line(cX + pL, p95Y, cX + pL + plW, p95Y);
+          doc.setFontSize(6.5);
+          doc.setTextColor(245, 158, 11);
+          doc.text(`P95: ${metrics.p95}ms`, cX + pL + 2, p95Y - 1);
+        }
+
+        // Bars
+        const pts = sortedLogsChronological.length;
+        sortedLogsChronological.forEach((l, i) => {
+          const x = cX + pL + (pts > 1 ? (i / (pts - 1)) * plW : plW / 2);
+          const bH = Math.max(1, (l.latencyMs / maxLimit) * plH);
+          const y = cY + pT + plH - bH;
+          const barW = Math.max(0.5, Math.min(3, (plotW / pts) * 0.75));
+
+          if (l.status === "error") doc.setFillColor(244, 63, 94);
+          else if (l.latencyMs > metrics.avgLatency * 1.4) doc.setFillColor(245, 158, 11);
+          else doc.setFillColor(6, 182, 212);
+
+          doc.rect(x - barW / 2, y, barW, bH, "F");
+        });
+      }
+
+      yPos += 48;
+
+      // Section 4: Diagnostik AI Cloud Run
       if (diagnosis) {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
         doc.setTextColor(30, 41, 59);
-        doc.text("3. DIAGNOSTIK & EVALUASI INFRASTRUKTUR CLOUD RUN", 14, yPos);
-        yPos += 4;
+        doc.text("4. DIAGNOSTIK & EVALUASI INFRASTRUKTUR CLOUD RUN", 14, yPos);
+        yPos += 3.5;
 
         doc.setFillColor(254, 243, 199); // amber-100
         doc.setDrawColor(251, 191, 36);
-        doc.roundedRect(14, yPos, pageWidth - 28, 18, 1.5, 1.5, "FD");
+        doc.roundedRect(14, yPos, pageWidth - 28, 17, 1.5, 1.5, "FD");
 
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
         doc.setTextColor(146, 64, 14);
-        doc.text("Analisis Cold Start & Skalabilitas:", 18, yPos + 5);
+        doc.text("Analisis Cold Start & Skalabilitas:", 18, yPos + 4.5);
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
         doc.setTextColor(120, 53, 15);
-        doc.text(`• ${diagnosis.coldStartMsg}`, 18, yPos + 10);
-        doc.text(`• ${diagnosis.scalabilityMsg}`, 18, yPos + 14.5);
-
-        yPos += 24;
+        doc.text(`• ${diagnosis.coldStartMsg}`, 18, yPos + 9.5);
+        doc.text(`• ${diagnosis.scalabilityMsg}`, 18, yPos + 14);
       }
 
-      // Section 4: Log Permintaan
+      // Section 5: Log Lengkap Riwayat Permintaan (Starts on Page 2)
+      doc.addPage();
+      yPos = 16;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.setTextColor(30, 41, 59);
-      doc.text("4. LOG RIWAYAT PERMINTAAN SAMPEL", 14, yPos);
+      doc.text(`5. LOG LENGKAP RIWAYAT PERMINTAAN (TOTAL ${sortedLogsChronological.length} REQUEST)`, 14, yPos);
       yPos += 4;
 
-      // Table Header
       const colX = [14, 26, 42, 64, 88, 118, 144, 170];
-      doc.setFillColor(15, 23, 42);
-      doc.rect(14, yPos, pageWidth - 28, 6, "F");
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
-      doc.setTextColor(255, 255, 255);
-      doc.text("ID", colX[0] + 2, yPos + 4);
-      doc.text("User", colX[1] + 1, yPos + 4);
-      doc.text("Waktu", colX[2] + 1, yPos + 4);
-      doc.text("Model Target", colX[3] + 1, yPos + 4);
-      doc.text("Kode HTTP", colX[4] + 1, yPos + 4);
-      doc.text("Latensi (ms)", colX[5] + 1, yPos + 4);
-      doc.text("Box", colX[6] + 1, yPos + 4);
-      doc.text("Hasil", colX[7] + 1, yPos + 4);
+      const renderTableHeader = (currY: number) => {
+        doc.setFillColor(15, 23, 42);
+        doc.rect(14, currY, pageWidth - 28, 6, "F");
 
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.setTextColor(255, 255, 255);
+        doc.text("ID", colX[0] + 2, currY + 4);
+        doc.text("User", colX[1] + 1, currY + 4);
+        doc.text("Waktu", colX[2] + 1, currY + 4);
+        doc.text("Model Target", colX[3] + 1, currY + 4);
+        doc.text("Kode HTTP", colX[4] + 1, currY + 4);
+        doc.text("Latensi (ms)", colX[5] + 1, currY + 4);
+        doc.text("Box", colX[6] + 1, currY + 4);
+        doc.text("Hasil", colX[7] + 1, currY + 4);
+      };
+
+      renderTableHeader(yPos);
       yPos += 6;
 
-      const sampleLogs = sortedLogsChronological.slice(0, 36);
-      sampleLogs.forEach((l, idx) => {
-        if (yPos > pageHeight - 18) {
+      // Print ALL requests in sortedLogsChronological
+      sortedLogsChronological.forEach((l, idx) => {
+        if (yPos > pageHeight - 16) {
           doc.addPage();
           yPos = 16;
-          // repeat table header on next page
-          doc.setFillColor(15, 23, 42);
-          doc.rect(14, yPos, pageWidth - 28, 6, "F");
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(7);
-          doc.setTextColor(255, 255, 255);
-          doc.text("ID", colX[0] + 2, yPos + 4);
-          doc.text("User", colX[1] + 1, yPos + 4);
-          doc.text("Waktu", colX[2] + 1, yPos + 4);
-          doc.text("Model Target", colX[3] + 1, yPos + 4);
-          doc.text("Kode HTTP", colX[4] + 1, yPos + 4);
-          doc.text("Latensi (ms)", colX[5] + 1, yPos + 4);
-          doc.text("Box", colX[6] + 1, yPos + 4);
-          doc.text("Hasil", colX[7] + 1, yPos + 4);
+          renderTableHeader(yPos);
           yPos += 6;
         }
 
@@ -735,7 +830,7 @@ export default function LoadTestPage() {
         doc.setTextColor(15, 23, 42);
 
         doc.text(`#${l.id}`, colX[0] + 2, yPos + 3.8);
-        doc.text(`U${l.userId || 1}`, colX[1] + 1, yPos + 3.8);
+        doc.text(`U${l.userId || 1}·r${l.userReqIndex || 1}`, colX[1] + 1, yPos + 3.8);
         doc.text(l.timestamp || "-", colX[2] + 1, yPos + 3.8);
         doc.text(l.modelTarget, colX[3] + 1, yPos + 3.8);
         doc.text(`${l.httpCode}`, colX[4] + 1, yPos + 3.8);
@@ -1451,6 +1546,8 @@ export default function LoadTestPage() {
           {/* SVG Latency Chart */}
           <div className="w-full overflow-hidden bg-slate-950/80 rounded-xl border border-slate-800/80 p-2">
             <svg
+              id="latency-svg-chart"
+              xmlns="http://www.w3.org/2000/svg"
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
               className="w-full h-auto block select-none"
               style={{ minHeight: "150px" }}
