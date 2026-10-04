@@ -9,14 +9,14 @@ const MODEL_CONFIGS = [
     id: "model_1" as const,
     key: "multiclass" as const,
     name: "Model 1: Multiclass (Penyakit Spesifik)",
-    baseUrl: process.env.NEXT_PUBLIC_MODEL_1_URL || "https://predict-6ab3fedd1e05d96795884b28-dproatj77a-et.a.run.app",
+    baseUrl: process.env.NEXT_PUBLIC_MODEL_1_URL || "https://predict-6ac277ed9e8044ef41e8c9f8-dproatj77a-et.a.run.app",
     preferredKey: PRIMARY_API_KEY,
   },
   {
     id: "model_2" as const,
     key: "binaryclass" as const,
     name: "Model 2: Binaryclass (Sehat vs Sakit)",
-    baseUrl: process.env.NEXT_PUBLIC_MODEL_2_URL || "https://predict-6ab3fee4cb033e32d1ef6cb2-dproatj77a-et.a.run.app",
+    baseUrl: process.env.NEXT_PUBLIC_MODEL_2_URL || "https://predict-6ac278239e8044ef41e8c9fa-dproatj77a-et.a.run.app",
     preferredKey: PRIMARY_API_KEY,
   },
   {
